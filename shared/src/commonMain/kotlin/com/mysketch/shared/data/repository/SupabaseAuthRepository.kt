@@ -126,8 +126,9 @@ class SupabaseAuthRepository(
         return try {
             val signUpResult = createAuthUser(email, password, username)
             if (signUpResult.isSuccess) {
-                val userId = signUpResult.getOrThrow()
-                ensureProfileExists(userId, email, username).map { userId }
+                // The on_auth_user_created database trigger creates the profile in the
+                // same transaction as the auth user. Do not issue a client-side INSERT.
+                Result.success(signUpResult.getOrThrow())
             } else {
                 signUpResult
             }
@@ -139,14 +140,12 @@ class SupabaseAuthRepository(
     }
 
     /**
-     * Verifies if a user profile exists in the 'users' table and creates one if it's missing.
-     *
-     * This synchronization step is crucial for new users or those who signed up via
-     * mechanisms that don't automatically trigger profile creation.
+     * Verifies that the Supabase Auth database trigger created the user's profile.
+     * Profile rows are created server-side; the client must never INSERT into users.
      *
      * @param userId The unique identifier for the user.
-     * @param email The user's email address, used to generate a default username if needed.
-     * @param username An optional preferred username.
+     * @param email Retained for API compatibility.
+     * @param username An optional preferred username to synchronize.
      */
     override suspend fun ensureProfileExists(userId: String, email: String, username: String?): Result<Unit> {
         return try {
@@ -162,15 +161,9 @@ class SupabaseAuthRepository(
 
                 val actualUsername = username ?: email.substringBefore("@")
                 if (count == null || count == 0L) {
-                    Napier.d("Profile does not exist for $userId, creating new profile...", tag = TAG)
-                    // SECURITY: Do not include sensitive fields (account_premium, verify, banned) here. They must be handled server-side.
-                    val profileInsert = UserProfileInsert(
-                        uid = userId,
-                        username = actualUsername
+                    throw IllegalStateException(
+                        "Profile for $userId was not created by the Supabase Auth trigger"
                     )
-                    Napier.d("Inserting user profile for $userId into users table...", tag = TAG)
-                    client.from("users").insert(profileInsert)
-                    Napier.d("Successfully inserted user profile for $userId.", tag = TAG)
                 } else {
                     Napier.d("Profile already exists for $userId.", tag = TAG)
                     // If a custom username was provided during sign up, ensure it is synchronized on the existing profile
