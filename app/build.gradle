@@ -54,7 +54,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.synapse.social.studioasinc"
+        applicationId = "com.mysketch"
         buildConfigField "String", "SENTRY_DSN", "\"${sentryDsn}\""
         buildConfigField "double", "SENTRY_AGENT_TRACE_SAMPLE_RATE", sentryAgentTraceSampleRate
         minSdk = 26
