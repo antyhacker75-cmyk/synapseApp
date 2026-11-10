@@ -141,7 +141,7 @@ jobs:
       - name: 🔎 Verify shipped auth and push config
         run: |
           set -euo pipefail
-          build_config=app/build/generated/source/buildConfig/release/com/synapse/social/studioasinc/BuildConfig.java
+          build_config=app/build/generated/source/buildConfig/release/com/mysketch/BuildConfig.java
           if [ ! -f "$build_config" ]; then
             echo "::error title=BuildConfig::missing $build_config"
             exit 1
