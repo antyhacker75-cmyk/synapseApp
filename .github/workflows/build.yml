@@ -86,14 +86,12 @@ jobs:
             exit 1
           fi
           printf '%s\n' "$GOOGLE_SERVICES_JSON" > app/google-services.json
-          # The Gradle google-services plugin rejects malformed JSON; what it cannot catch is a
-          # valid file for the wrong project, which is how a deleted Firebase project shipped
-          # unnoticed. Pin the project number and both package clients here.
+          # Validate the current Firebase project and release application ID.
+          # The supplied google-services.json contains the release client.
           fail=0
           for pattern in \
-            '"project_number"[[:space:]]*:[[:space:]]*"999615440042"' \
-            '"package_name"[[:space:]]*:[[:space:]]*"com\.synapse\.social\.studioasinc"' \
-            '"package_name"[[:space:]]*:[[:space:]]*"com\.synapse\.social\.studioasinc\.debug"'; do
+            '"project_number"[[:space:]]*:[[:space:]]*"165546493522"' \
+            '"package_name"[[:space:]]*:[[:space:]]*"com\\.mysketch"'; do
             if ! grep -Eq "$pattern" app/google-services.json; then
               echo "::error title=google-services.json::pattern not found: $pattern"
               fail=1
@@ -161,7 +159,6 @@ jobs:
             fi
           }
           expect SUPABASE_URL "https://apqvyyphlrtmuyjnzmuq.supabase.co"
-          expect GOOGLE_WEB_CLIENT_ID "999615440042-9s9he8resh1k2i6st0dnmg1fiogv0vm6.apps.googleusercontent.com"
           expect ONESIGNAL_APP_ID "e6b42d8e-8039-4042-9d49-f96a7b675ad3"
           exit "$fail"
 
