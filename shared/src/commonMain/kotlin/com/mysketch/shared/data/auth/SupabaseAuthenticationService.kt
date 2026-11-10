@@ -75,20 +75,28 @@ class SupabaseAuthenticationService(
     override suspend fun createUserProfile(userId: String, email: String, username: String): Result<Unit> {
         return try {
             withContext(AppDispatchers.IO) {
-                val profileInsert = UserProfileInsert(
-                    uid = userId,
-                    username = username
-                )
-                client.from("users").insert(profileInsert)
+                val count = client.from("users").select(columns = Columns.list("uid")) {
+                    count(Count.EXACT)
+                    filter { eq("uid", userId) }
+                }.countOrNull()
 
-                // Note: user_settings and user_presence are automatically created by database trigger
-                // when the user signs up via Supabase Auth (see handle_new_auth_user trigger)
+                if (count == null || count == 0L) {
+                    throw IllegalStateException(
+                        "Profile for $userId was not created by the Supabase Auth trigger"
+                    )
+                }
 
-                Napier.d("User profile created successfully: $userId")
+                if (username.isNotBlank()) {
+                    client.from("users").update(mapOf("username" to username)) {
+                        filter { eq("uid", userId) }
+                    }
+                }
+
+                Napier.d("Verified existing user profile: $userId")
                 Result.success(Unit)
             }
         } catch (e: Exception) {
-            Napier.e("Create user profile failed", e)
+            Napier.e("Verify user profile failed", e)
             Result.failure(e)
         }
     }
@@ -104,7 +112,11 @@ class SupabaseAuthenticationService(
                 }.countOrNull()
 
                 if (count == null || count == 0L) {
-                    createUserProfile(userId, email, email.substringBefore("@"))
+                    Result.failure(
+                        IllegalStateException(
+                            "Profile for $userId was not created by the Supabase Auth trigger"
+                        )
+                    )
                 } else {
                     Result.success(Unit)
                 }
