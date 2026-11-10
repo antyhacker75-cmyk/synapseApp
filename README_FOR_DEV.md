@@ -279,8 +279,8 @@ Supabase and third-party credentials are injected into `BuildConfig` at build ti
 
 | Build type | Application ID | Use case |
 | :--- | :--- | :--- |
-| `debug` | `com.synapse.social.studioasinc.debug` | Local development |
-| `release` | `com.synapse.social.studioasinc` | Release builds |
+| `debug` | `com.mysketch.debug` | Local development |
+| `release` | `com.mysketch` | Release builds |
 
 ---
 

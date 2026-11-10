@@ -1,0 +1,82 @@
+package com.mysketch.feature.shared.components.post
+
+import com.mysketch.domain.model.Post
+import com.mysketch.domain.model.ReactionType
+import com.mysketch.feature.home.home.FeedViewModel
+import com.mysketch.feature.profile.profile.ProfileViewModel
+import com.mysketch.feature.post.postdetail.PostDetailViewModel
+
+object PostActionsFactory {
+
+    fun create(
+        viewModel: FeedViewModel,
+        onComment: (Post) -> Unit,
+        onShare: (Post) -> Unit,
+        onQuote: (Post) -> Unit,
+        onUserClick: (String) -> Unit,
+        onOptionClick: (Post) -> Unit,
+        onMediaClick: (Post, Int) -> Unit
+    ): PostActions {
+        return PostActions(
+            onLike = viewModel::likePost,
+            onComment = onComment,
+            onShare = onShare,
+            onRepost = viewModel::resharePost,
+            onQuote = onQuote,
+            onBookmark = viewModel::bookmarkPost,
+            onOptionClick = onOptionClick,
+            onPollVote = viewModel::votePoll,
+            onUserClick = onUserClick,
+            onMediaClick = onMediaClick,
+            onReactionSelected = viewModel::reactToPost
+        )
+    }
+
+    fun create(
+        viewModel: ProfileViewModel,
+        onComment: (Post) -> Unit,
+        onShare: (Post) -> Unit,
+        onQuote: (Post) -> Unit,
+        onUserClick: (String) -> Unit,
+        onOptionClick: (Post) -> Unit,
+        onMediaClick: (Post, Int) -> Unit
+    ): PostActions {
+        return PostActions(
+            onLike = { post -> viewModel.reactToPost(post, ReactionType.LIKE) },
+            onComment = onComment,
+            onShare = onShare,
+            onRepost = { post -> viewModel.resharePost(post) },
+            onQuote = onQuote,
+            onBookmark = { post -> viewModel.toggleSave(post.id) },
+            onOptionClick = onOptionClick,
+            onPollVote = viewModel::votePoll,
+            onUserClick = onUserClick,
+            onMediaClick = onMediaClick,
+            onReactionSelected = viewModel::reactToPost
+        )
+    }
+
+    fun create(
+        viewModel: PostDetailViewModel,
+        onComment: (Post) -> Unit,
+        onShare: (Post) -> Unit,
+        onQuote: (Post) -> Unit,
+        onUserClick: (String) -> Unit,
+        onOptionClick: (Post) -> Unit,
+        onMediaClick: (Post, Int) -> Unit
+    ): PostActions {
+        return PostActions(
+            onLike = { _ -> viewModel.toggleReaction(ReactionType.LIKE) },
+            onComment = onComment,
+            onShare = onShare,
+            onRepost = { _ -> viewModel.toggleReshare() },
+            onQuote = onQuote,
+            onBookmark = { _ -> viewModel.toggleBookmark() },
+            onOptionClick = onOptionClick,
+            onPollVote = { _, index -> viewModel.votePoll(index) },
+            onUserClick = onUserClick,
+            onMediaClick = onMediaClick,
+            onReactionSelected = { _, reaction -> viewModel.toggleReaction(reaction) }
+        )
+    }
+}

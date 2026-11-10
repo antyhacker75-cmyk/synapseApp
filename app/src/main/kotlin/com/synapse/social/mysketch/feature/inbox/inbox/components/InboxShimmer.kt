@@ -1,0 +1,94 @@
+package com.mysketch.feature.inbox.inbox.components
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import com.mysketch.feature.shared.theme.Spacing
+import com.mysketch.ui.components.ShimmerBox
+import com.mysketch.ui.components.ShimmerCircle
+import com.mysketch.feature.inbox.inbox.theme.InboxTheme
+import com.mysketch.feature.shared.theme.Sizes
+
+@Composable
+fun InboxShimmer(
+    modifier: Modifier = Modifier,
+    itemCount: Int = 8
+) {
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(vertical = Spacing.space8),
+        verticalArrangement = Arrangement.spacedBy(InboxTheme.dimens.GroupedItemGap)
+    ) {
+        items(itemCount) { index ->
+            val isFirst = index == 0
+            val isLast = index == itemCount - 1
+            val shape = when {
+                itemCount == 1 -> InboxTheme.shapes.GroupedListSingleShape
+                isFirst -> InboxTheme.shapes.GroupedListTopShape
+                isLast -> InboxTheme.shapes.GroupedListBottomShape
+                else -> InboxTheme.shapes.GroupedListMiddleShape
+            }
+            
+            ConversationItemShimmer(
+                modifier = Modifier.padding(horizontal = Spacing.space16),
+                shape = shape
+            )
+        }
+    }
+}
+
+@Composable
+private fun ConversationItemShimmer(
+    modifier: Modifier = Modifier,
+    shape: androidx.compose.ui.graphics.Shape = InboxTheme.shapes.ChatItemCard
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surfaceContainer, shape)
+            .padding(horizontal = Spacing.space16, vertical = Spacing.space12),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        ShimmerCircle(size = InboxTheme.dimens.AvatarSize)
+        
+        Spacer(modifier = Modifier.width(Spacing.space16))
+        
+        Column(modifier = Modifier.weight(1f)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                ShimmerBox(
+                    modifier = Modifier
+                        .width(Sizes.Height120)
+                        .height(Sizes.ShimmerLineHeight),
+                    shape = RoundedCornerShape(Sizes.CornerSmall)
+                )
+                
+                ShimmerBox(
+                    modifier = Modifier
+                        .width(Sizes.ShimmerWidthExtraSmall)
+                        .height(Sizes.ShimmerLineHeightSmall),
+                    shape = RoundedCornerShape(Sizes.CornerSmall)
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(Spacing.space4))
+            
+            ShimmerBox(
+                modifier = Modifier
+                    .fillMaxWidth(0.7f)
+                    .height(Sizes.HeightTiny),
+                shape = RoundedCornerShape(Sizes.CornerSmall)
+            )
+        }
+    }
+}

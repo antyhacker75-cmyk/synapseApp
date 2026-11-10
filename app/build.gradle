@@ -32,7 +32,7 @@ if (parsedSentryAgentTraceSampleRate < 0.0 || parsedSentryAgentTraceSampleRate >
 }
 
 android {
-    namespace = "com.synapse.social.studioasinc"
+    namespace = "com.mysketch"
     compileSdk 37
     // androidx.compose 1.13.0-beta02 AARs declare minCompileSdk=37 with minCompileMinorSdk=1 and
     // minCompileSdkExtension=0, so the compile platform must be the base 37.1. compileSdkExtension

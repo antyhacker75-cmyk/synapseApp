@@ -185,7 +185,7 @@ kotlin {
 sqldelight {
   databases {
     create("StorageDatabase") {
-      packageName.set("com.synapse.social.studioasinc.shared.data.database")
+      packageName.set("com.mysketch.shared.data.database")
       verifyMigrations.set(false)
     }
   }
@@ -195,7 +195,7 @@ dependencies {
 }
 
 android {
-    namespace = "com.synapse.social.studioasinc.shared"
+    namespace = "com.mysketch.shared"
     compileSdk = 37
     compileSdkExtension = 1
     buildToolsVersion = "36.0.0"

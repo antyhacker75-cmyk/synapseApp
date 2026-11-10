@@ -6,7 +6,7 @@
 -keep public class * extends android.app.Activity
 
 # Specifically keep your N3 activity (if you know its original name)
--keep class com.synapse.social.studioasinc.N3 { *; }
+-keep class com.mysketch.N3 { *; }
 
 # Keep Supabase classes
 -keep class io.github.jan.supabase.** { *; }
@@ -28,7 +28,7 @@
 # WebRTC (io.github.webrtc-sdk:android) — the JNI layer calls back into org.webrtc classes by name,
 # so R8 must not rename or strip them. Guards a future minifyEnabled = true flip.
 -keep class org.webrtc.** { *; }
--keep class com.synapse.social.studioasinc.data.call.webrtc.** { *; }
+-keep class com.mysketch.data.call.webrtc.** { *; }
 -dontwarn org.webrtc.**
 
 # jni_zero ships with WebRTC M144 and is reachable only from native code: JNI_OnLoad does
@@ -50,8 +50,8 @@
 
 # ActionQueue writes PendingAction as Gson JSON into EncryptedSharedPreferences. Field names and
 # enum constants are the storage keys — obfuscating them orphans actions already queued on device.
--keepclassmembers class com.synapse.social.studioasinc.shared.domain.model.PendingAction { *; }
--keepclassmembers enum com.synapse.social.studioasinc.shared.domain.model.PendingAction$ActionType { *; }
+-keepclassmembers class com.mysketch.shared.domain.model.PendingAction { *; }
+-keepclassmembers enum com.mysketch.shared.domain.model.PendingAction$ActionType { *; }
 
 # EncryptedSharedPreferences reaches Tink's primitive registry, which instantiates by class name.
 -keep class com.google.crypto.tink.** { *; }
@@ -61,4 +61,4 @@
 
 # OneSignal discovers the notification service extension by fully-qualified class name from manifest
 # meta-data, so R8 must not rename or remove it.
--keep class com.synapse.social.studioasinc.core.NotificationExtensionService { *; }
+-keep class com.mysketch.core.NotificationExtensionService { *; }

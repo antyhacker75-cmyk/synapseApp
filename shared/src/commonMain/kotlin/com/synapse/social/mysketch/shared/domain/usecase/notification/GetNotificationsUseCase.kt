@@ -1,0 +1,30 @@
+package com.mysketch.shared.domain.usecase.notification
+
+import com.mysketch.shared.domain.repository.AuthRepository
+import com.mysketch.shared.domain.repository.NotificationRepository
+import com.mysketch.shared.domain.model.Notification
+import com.mysketch.shared.domain.model.NotificationError
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import io.github.aakira.napier.Napier
+
+class GetNotificationsUseCase(
+    private val notificationRepository: NotificationRepository,
+    private val authRepository: AuthRepository
+) {
+    operator fun invoke(limit: Long = 50, before: String? = null, beforeId: String? = null): Flow<Result<List<Notification>>> = flow {
+        val userId = authRepository.getCurrentUserId()
+        if (userId == null) {
+            emit(Result.failure(NotificationError.Unauthorized))
+            return@flow
+        }
+
+        try {
+            val notifications = notificationRepository.fetchNotifications(userId, limit, before, beforeId)
+            emit(Result.success(notifications))
+        } catch (e: Exception) {
+            Napier.e("Failed to get notifications", e)
+            emit(Result.failure(NotificationError.NetworkError))
+        }
+    }
+}

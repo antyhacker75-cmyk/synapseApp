@@ -1,0 +1,10 @@
+package com.mysketch.feature.profile.profile
+
+import com.mysketch.data.model.UserProfile
+
+sealed class ProfileUiState {
+    object Loading : ProfileUiState()
+    data class Success(val profile: UserProfile) : ProfileUiState()
+    data class Error(val message: String, val exception: Throwable? = null) : ProfileUiState()
+    object Empty : ProfileUiState()
+}

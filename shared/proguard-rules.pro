@@ -15,11 +15,11 @@
     kotlinx.serialization.KSerializer serializer(...);
 }
 
--keep,includedescriptorclasses class com.synapse.social.studioasinc.**$$serializer { *; }
--keepclassmembers class com.synapse.social.studioasinc.** {
+-keep,includedescriptorclasses class com.mysketch.**$$serializer { *; }
+-keepclassmembers class com.mysketch.** {
     *** Companion;
 }
--keepclasseswithmembers class com.synapse.social.studioasinc.** {
+-keepclasseswithmembers class com.mysketch.** {
     kotlinx.serialization.KSerializer serializer(...);
 }
 

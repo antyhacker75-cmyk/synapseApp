@@ -1,0 +1,292 @@
+package com.mysketch.feature.shared.components.post
+
+import com.mysketch.feature.shared.theme.Sizes
+ 
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
+import coil3.compose.AsyncImage
+import com.mysketch.domain.model.Post
+import com.mysketch.feature.shared.components.LinkPreviewsSection
+import com.mysketch.domain.model.LinkPreview
+
+
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import android.widget.TextView
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.toArgb
+import com.mysketch.styling.MarkdownRenderer
+import android.text.TextUtils
+import androidx.compose.ui.res.stringResource
+import com.mysketch.R
+import com.mysketch.core.util.IntentUtils
+import com.mysketch.ui.navigation.DeepLink
+import com.mysketch.feature.shared.theme.Spacing
+
+import com.mysketch.ui.settings.PostViewStyle
+
+@Composable
+fun PostContent(
+    text: String?,
+    mediaUrls: List<String>,
+    postViewStyle: PostViewStyle = PostViewStyle.SWIPE,
+    isVideo: Boolean,
+    pollQuestion: String?,
+    pollOptions: List<PollOption>? = null,
+    userPollVote: Int? = null,
+    onMediaClick: (Post, Int) -> Unit = { _, _ -> },
+    onPollVote: (String) -> Unit,
+    quotedPost: Post? = null,
+    linkPreviews: List<LinkPreview>? = null,
+    isExpanded: Boolean = false,
+    modifier: Modifier = Modifier,
+    getLinkMetadataUseCase: com.mysketch.shared.domain.usecase.GetLinkMetadataUseCase? = null,
+    post: Post? = null
+) {
+    Column(modifier = modifier) {
+        if (!text.isNullOrBlank()) {
+            var localExpanded by remember(text) { mutableStateOf(false) }
+            var isTruncated by remember(text) { mutableStateOf(false) }
+            val showFullText = isExpanded || localExpanded
+
+            // Remember references to prevent redundant layouts on scroll
+            var lastProcessedText by remember { mutableStateOf<String?>(null) }
+            var lastProcessedShowFullText by remember { mutableStateOf<Boolean?>(null) }
+
+            val context = LocalContext.current
+            val colorOnSurface = MaterialTheme.colorScheme.onSurface
+            val colorOnSurfaceArgb = remember(colorOnSurface) { colorOnSurface.toArgb() }
+
+            Box {
+                AndroidView(
+                    modifier = Modifier.fillMaxWidth(),
+                    factory = { ctx ->
+                        TextView(ctx).apply {
+                            setTextColor(colorOnSurfaceArgb)
+                            textSize = 16f
+                            movementMethod = android.text.method.LinkMovementMethod.getInstance()
+                        }
+                    },
+                    update = { textView ->
+                        if (textView.tag != text) {
+                            MarkdownRenderer.get(context).render(textView, text ?: "")
+                            textView.tag = text
+                        }
+                        textView.setTextColor(colorOnSurfaceArgb)
+                        val maxLines = if (showFullText) Int.MAX_VALUE else 10
+                        if (textView.maxLines != maxLines) {
+                            textView.maxLines = maxLines
+                        }
+                        val ellipsize = if (showFullText) null else TextUtils.TruncateAt.END
+                        if (textView.ellipsize != ellipsize) {
+                            textView.ellipsize = ellipsize
+                        }
+
+                        if (lastProcessedText != text || lastProcessedShowFullText != showFullText) {
+                            lastProcessedText = text
+                            lastProcessedShowFullText = showFullText
+                            val layout = textView.layout
+                            if (layout != null) {
+                                val fullLineCount = layout.lineCount
+                                isTruncated = if (showFullText) {
+                                    false
+                                } else {
+                                    fullLineCount >= 10 && layout.getEllipsisCount(fullLineCount - 1) > 0
+                                }
+                            } else {
+                                textView.post {
+                                    val postLayout = textView.layout ?: return@post
+                                    val fullLineCount = postLayout.lineCount
+                                    isTruncated = if (showFullText) {
+                                        false
+                                    } else {
+                                        fullLineCount >= 10 && postLayout.getEllipsisCount(fullLineCount - 1) > 0
+                                    }
+                                }
+                            }
+                        }
+                    }
+                )
+
+                if (isTruncated && !showFullText) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.BottomStart)
+                            .clickable { localExpanded = true }
+                    ) {
+                        Text(
+                            text = stringResource(R.string.see_more),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+            }
+
+            if (showFullText && !isExpanded) {
+                Text(
+                    text = stringResource(R.string.show_less),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.clickable { localExpanded = false }
+                )
+            }
+        }
+
+        if (mediaUrls.isNotEmpty()) {
+            MediaContent(
+                mediaUrls = mediaUrls,
+                isVideo = isVideo,
+                postViewStyle = postViewStyle,
+                onMediaClick = onMediaClick,
+                modifier = Modifier,
+                post = post
+            )
+        }
+
+        // Link previews are rendered through the single shared pipeline, so every screen that
+        // renders a post (feed, post detail, profile, shared posts, chat) shows exactly the same
+        // preview with the same metadata, styling and interaction behaviour.
+        LinkPreviewsSection(
+            text = text,
+            serverPreviews = linkPreviews,
+            useCase = getLinkMetadataUseCase
+        )
+
+        if (pollQuestion != null && pollOptions != null) {
+            PollContent(
+                question = pollQuestion,
+                options = pollOptions,
+                totalVotes = pollOptions.sumOf { it.voteCount },
+                onVote = onPollVote
+            )
+        }
+ 
+        if (quotedPost != null) {
+            val context = LocalContext.current
+            Spacer(modifier = Modifier.height(Spacing.space8))
+            QuotedPostCard(
+                quotedPost = quotedPost,
+                // Opening the quoted post uses the universal `synapse://post/{id}` deep link, so the
+                // embed is tappable from every screen that renders a PostCard (feed, profile, search,
+                // post detail) and matches the chat shared-post behaviour.
+                onPostClick = { IntentUtils.openUrl(context, DeepLink.post(quotedPost.id)) }
+            )
+        }
+    }
+}
+ 
+@Composable
+fun QuotedPostCard(
+    quotedPost: Post,
+    onPostClick: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    val shape = RoundedCornerShape(MaterialTheme.shapes.medium.topStart)
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant,
+                shape = shape
+            )
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .clickable(onClick = onPostClick)
+            .padding(Spacing.space16)
+    ) {
+        if (quotedPost.isDeleted == true) {
+            Text(
+                text = stringResource(R.string.error_post_not_found),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                AsyncImage(
+                    model = quotedPost.avatarUrl,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(Sizes.IconLarge)
+                        .clip(CircleShape),
+                    contentScale = ContentScale.Crop
+                )
+                Spacer(modifier = Modifier.width(Spacing.space8))
+                Text(
+                    text = quotedPost.displayName ?: quotedPost.username ?: "Unknown",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                if (quotedPost.isVerified) {
+                    Spacer(modifier = Modifier.width(Spacing.space4))
+                }
+                Spacer(modifier = Modifier.width(Spacing.space4))
+                Text(
+                    text = stringResource(R.string.post_username_format, quotedPost.username ?: ""),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            if (!quotedPost.postText.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(Spacing.space4))
+                Text(
+                    text = quotedPost.postText ?: "",
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+
+            if (!quotedPost.mediaItems.isNullOrEmpty()) {
+                Spacer(modifier = Modifier.height(Spacing.space8))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(150.dp)
+                        .clip(MaterialTheme.shapes.small)
+                        .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                ) {
+                    AsyncImage(
+                        model = quotedPost.mediaItems?.firstOrNull()?.url ?: "",
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxWidth(),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+            }
+        }
+    }
+}
