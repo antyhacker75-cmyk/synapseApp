@@ -167,54 +167,10 @@ class ProfileRepositoryImpl(
             val isLimitedPreview = ownerResponse == null && previewResponse != null
 
             if (response == null) {
-                android.util.Log.e("ProfileRepository", "Profile not found for userId: $actualUserId")
-
-                try {
-                    val currentUser = client.auth.currentUserOrNull()
-                    if (currentUser != null && currentUser.id == actualUserId) {
-                        android.util.Log.d("ProfileRepository", "Attempting to create missing profile for current user")
-
-                        val userMap = mapOf(
-                            "uid" to actualUserId,
-                            "username" to (currentUser.email?.substringBefore("@") ?: "user"),
-                            "email" to (currentUser.email ?: ""),
-                            "created_at" to java.time.Instant.now().toString(),
-                            "join_date" to java.time.Instant.now().toString(),
-                            "followers_count" to 0,
-                            "following_count" to 0,
-                            "posts_count" to 0,
-                            "user_level_xp" to 0
-                        )
-
-                        client.from("users").insert(userMap)
-                        android.util.Log.d("ProfileRepository", "Created missing profile, retrying query")
-
-                        val retryResponse = client.from("users").select() {
-                            filter { eq(KEY_UID, actualUserId) }
-                        }.decodeSingleOrNull<JsonObject>()
-
-                        if (retryResponse != null) {
-                            val postCount = try {
-                                client.from("posts").select(columns = Columns.raw("count")) {
-                                    filter { eq(ProfilePostsRepositoryImpl.KEY_AUTHOR_UID, actualUserId) }
-                                    count(io.github.jan.supabase.postgrest.query.Count.EXACT)
-                                }.countOrNull() ?: 0
-                            } catch (e: Exception) {
-                                0
-                            }
-
-                            val profile = parseUserProfile(retryResponse, postCount.toInt())
-                            android.util.Log.d("ProfileRepository", "Profile created and loaded successfully")
-                            emit(Result.success(profile))
-                            return@flow
-                        }
-                    }
-                } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                    throw cancelled
-                } catch (createError: Exception) {
-                    android.util.Log.e("ProfileRepository", "Failed to create missing profile", createError)
-                }
-
+                android.util.Log.e(
+                    "ProfileRepository",
+                    "Profile not found for userId: $actualUserId. The Supabase Auth trigger should create it."
+                )
                 emit(Result.failure(Exception("Profile not found for user: $actualUserId")))
                 return@flow
             }
