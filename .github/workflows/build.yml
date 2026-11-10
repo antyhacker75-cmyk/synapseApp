@@ -86,18 +86,16 @@ jobs:
             exit 1
           fi
           printf '%s\n' "$GOOGLE_SERVICES_JSON" > app/google-services.json
-          # Validate the current Firebase project and release application ID.
-          # The supplied google-services.json contains the release client.
-          fail=0
-          for pattern in \
-            '"project_number"[[:space:]]*:[[:space:]]*"165546493522"' \
-            '"package_name"[[:space:]]*:[[:space:]]*"com\\.mysketch"'; do
-            if ! grep -Eq "$pattern" app/google-services.json; then
-              echo "::error title=google-services.json::pattern not found: $pattern"
-              fail=1
-            fi
-          done
-          exit "$fail"
+          # Validate the current Firebase project and release application ID using JSON fields.
+          jq -e '.project_info.project_number == "165546493522"' app/google-services.json >/dev/null || {
+            echo "::error title=google-services.json::unexpected Firebase project number"
+            exit 1
+          }
+          jq -e 'any(.client[]?; .client_info.android_client_info.package_name == "com.mysketch")' app/google-services.json >/dev/null || {
+            echo "::error title=google-services.json::package com.mysketch not found in Firebase clients"
+            exit 1
+          }
+
 
       - name: 🐘 Setup Gradle
         uses: gradle/actions/setup-gradle@v6
