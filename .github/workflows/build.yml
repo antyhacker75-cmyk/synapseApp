@@ -49,7 +49,7 @@ permissions:
 jobs:
   build:
     name: 🔨 Build APKs
-    runs-on: ${{ vars.IS_USING_HOSTED_RUNNERS == 'true' && 'self-hosted' || 'blacksmith-4vcpu-ubuntu-2404' }}
+    runs-on: ubuntu-latest
     # contents:write is used at most once per run, by "Commit AI repairs", and only after the
     # release build and the release verification both passed. Nothing else needs write access,
     # and no other step receives a token that could use it.
