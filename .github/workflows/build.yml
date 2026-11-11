@@ -85,7 +85,23 @@ jobs:
             echo "::error title=google-services.json::GOOGLE_SERVICES_JSON is empty"
             exit 1
           fi
-          printf '%s\n' "$GOOGLE_SERVICES_JSON" > app/google-services.json
+          # GOOGLE_SERVICES_JSON must contain the complete google-services.json object.
+          # Accept either raw JSON or a base64-encoded JSON object so the secret can be
+          # stored safely without YAML/quoting issues. A bare project number is not enough
+          # to configure the Firebase SDK.
+          raw="$GOOGLE_SERVICES_JSON"
+          if printf '%s' "$raw" | jq -e 'type == "object"' >/dev/null 2>&1; then
+            printf '%s\n' "$raw" > app/google-services.json
+          else
+            decoded="$(printf '%s' "$raw" | base64 --decode 2>/dev/null || true)"
+            if printf '%s' "$decoded" | jq -e 'type == "object"' >/dev/null 2>&1; then
+              printf '%s\n' "$decoded" > app/google-services.json
+            else
+              echo "::error title=google-services.json::GOOGLE_SERVICES_JSON is not a complete Firebase JSON object. Set the secret to the full google-services.json contents (or base64-encode that file); a project number alone is insufficient."
+              exit 1
+            fi
+          fi
+
           # Validate the current Firebase project and release application ID using JSON fields.
           jq -e '.project_info.project_number == "1086962075256"' app/google-services.json >/dev/null || {
             echo "::error title=google-services.json::unexpected Firebase project number"
