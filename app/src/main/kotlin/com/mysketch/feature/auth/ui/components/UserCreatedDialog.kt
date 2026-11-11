@@ -16,14 +16,14 @@ fun UserCreatedDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = stringResource(R.string.user_created_title),
+                text = "Verify your email first",
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.onSurface
             )
         },
         text = {
             Text(
-                text = stringResource(R.string.user_created_message),
+                text = "We sent a verification link to your Gmail address. Open that email and verify your account before signing in. If you do not see it, check Spam or Junk.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
