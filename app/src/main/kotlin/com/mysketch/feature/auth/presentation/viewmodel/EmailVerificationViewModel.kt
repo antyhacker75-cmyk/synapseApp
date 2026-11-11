@@ -95,18 +95,30 @@ class EmailVerificationViewModel @Inject constructor(
         verificationPollJob?.cancel()
         val pollInterval = 3000L
         verificationPollJob = viewModelScope.launch {
+            var lastRefreshError: String? = null
             while (_uiState.value is AuthUiState.EmailVerification) {
                 delay(pollInterval)
                 if (_uiState.value !is AuthUiState.EmailVerification) break
 
-                refreshSessionUseCase().onSuccess {
-                    if (isEmailVerifiedUseCase()) {
-                        _uiState.value = AuthUiState.Success("Email verified successfully. You can now sign in.")
-                        delay(1000)
-                        authRepository.signOut()
-                        _navigationEvent.emit(AuthNavigationEvent.NavigateToSignIn)
+                refreshSessionUseCase().fold(
+                    onSuccess = {
+                        lastRefreshError = null
+                        if (isEmailVerifiedUseCase()) {
+                            _uiState.value = AuthUiState.Success("Email verified successfully. You can now sign in.")
+                            delay(1000)
+                            authRepository.signOut()
+                            _navigationEvent.emit(AuthNavigationEvent.NavigateToSignIn)
+                        }
+                    },
+                    onFailure = { error ->
+                        val message = error.message
+                            ?: "Your email is verified, but your profile could not be saved. Check Realtime Database rules and your connection."
+                        if (message != lastRefreshError) {
+                            lastRefreshError = message
+                            UiEventManager.emit(UiEvent.Error(message))
+                        }
                     }
-                }
+                )
             }
         }
     }
