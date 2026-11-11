@@ -81,37 +81,42 @@ class FirebaseAuthRepository(
         require(user.isEmailVerified) { "Verify your email address before creating your profile" }
         writeUserRecords(
             user,
-            username?.trim()?.takeIf { it.isNotEmpty() } ?: email.substringBefore("@"),
-            includeCreatedAt = false
-        )
+            username?.trim()?.takeIf { it.isNotEmpty() } ?: email.substringBefore("@"))
     }
 
     private suspend fun writeUserRecords(
         user: FirebaseUser,
-        username: String,
-        includeCreatedAt: Boolean
+        username: String
     ) {
         require(user.isEmailVerified) { "Email verification is required before writing account data" }
 
         val normalized = username.trim().lowercase()
             .ifBlank { user.email?.substringBefore("@")?.lowercase() ?: "member" }
+        val createdAt = user.metadata?.creationTimestamp ?: System.currentTimeMillis()
 
+        // Keep the email address in the private users node only. Public profile reads
+        // must never expose the account's private email address.
         val userData = hashMapOf<String, Any>(
             "uid" to user.uid,
             "id" to user.uid,
             "email" to (user.email ?: ""),
             "username" to normalized,
             "emailVerified" to true,
+            "createdAt" to createdAt,
             "updatedAt" to ServerValue.TIMESTAMP
         )
-        if (includeCreatedAt) userData["createdAt"] = ServerValue.TIMESTAMP
-
-        val profileData = HashMap(userData).apply {
-            put("displayName", normalized)
-        }
+        val profileData = hashMapOf<String, Any>(
+            "uid" to user.uid,
+            "id" to user.uid,
+            "username" to normalized,
+            "displayName" to normalized,
+            "emailVerified" to true,
+            "createdAt" to createdAt,
+            "updatedAt" to ServerValue.TIMESTAMP
+        )
 
         // Realtime Database creates these paths automatically when updateChildren()
-        // writes them. Multi-location update keeps the records and username index in sync.
+        // writes them. Multi-location update keeps records and the username index in sync.
         val updates = hashMapOf<String, Any?>(
             "users/${user.uid}" to userData,
             "profiles/${user.uid}" to profileData,
@@ -133,9 +138,7 @@ class FirebaseAuthRepository(
                 user,
                 user.displayName?.trim()?.takeIf { it.isNotEmpty() }
                     ?: user.email?.substringBefore("@")
-                    ?: "member",
-                includeCreatedAt = false
-            )
+                    ?: "member")
         }
         user.uid
     }
@@ -168,9 +171,7 @@ class FirebaseAuthRepository(
                 user,
                 user.displayName?.trim()?.takeIf { it.isNotEmpty() }
                     ?: user.email?.substringBefore("@")
-                    ?: "member",
-                includeCreatedAt = false
-            )
+                    ?: "member")
         }
         Unit
     }
@@ -214,9 +215,7 @@ class FirebaseAuthRepository(
         require(user.isEmailVerified) { "Verify your Google account email before continuing" }
         writeUserRecords(
             user,
-            user.displayName ?: user.email?.substringBefore("@") ?: "member",
-            includeCreatedAt = false
-        )
+            user.displayName ?: user.email?.substringBefore("@") ?: "member")
         user.uid
     }
 
