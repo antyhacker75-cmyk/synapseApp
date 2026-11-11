@@ -10,7 +10,7 @@
     },
     "profiles": {
       "$uid": {
-        ".read": "auth != null && auth.token.email_verified === true && auth.uid === $uid",
+        ".read": "auth != null && auth.token.email_verified === true",
         ".write": "auth != null && auth.token.email_verified === true && auth.uid === $uid"
       }
     },
