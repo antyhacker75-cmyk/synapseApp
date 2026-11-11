@@ -297,10 +297,9 @@ dependencies {
     // Firebase Vertex AI for Gemini
     implementation(platform("com.google.firebase:firebase-bom:35.0.0"))
     implementation("com.google.firebase:firebase-messaging")
-    // Firebase backend migration foundation: Auth and Cloud Firestore.
-    // Existing Supabase call sites remain until their repositories are migrated safely.
+    // Firebase Authentication and Realtime Database for account/profile data.
     implementation("com.google.firebase:firebase-auth")
-    implementation("com.google.firebase:firebase-firestore")
+    implementation("com.google.firebase:firebase-database")
     implementation("com.google.firebase:firebase-vertexai:16.0.0")
     implementation("com.google.genai:google-genai:1.29.0")
 
