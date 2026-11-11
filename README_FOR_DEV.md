@@ -19,7 +19,7 @@
 | DI (Android) | Hilt |
 | DI (Shared) | Koin |
 | Build tool | Gradle |
-| Backend | Supabase (Auth, Realtime, Storage, PostgREST, Edge Functions) |
+| Backend | Firebase Authentication + Realtime Database; Supabase services remain in legacy feature modules and Storage |
 | Networking | Ktor |
 | Local persistence | SQLDelight |
 | E2EE | Signal Protocol (libsignal-client) |
@@ -284,11 +284,9 @@ Supabase and third-party credentials are injected into `BuildConfig` at build ti
 
 ### Firebase backend migration setup
 
-The Android module now includes Firebase Authentication and Cloud Firestore SDKs
-under the existing Firebase BoM. This is the dependency foundation only; existing
-Supabase authentication, PostgreSQL, Realtime, and Edge Function call sites have
-not yet been migrated. Supabase Storage is intended to remain the file-storage
-provider during the migration.
+The Android email-authentication flow uses Firebase Authentication and Firebase Realtime Database. Firebase Realtime Database stores JSON nodes (not SQL tables): account data is created automatically at `users/{uid}`, profile data at `profiles/{uid}`, and the username index at `usernames/{normalizedUsername}` when the verified account is first written. Registration sends an email-verification link and does not create protected profile records until the user verifies the email. Sign-in is blocked from entering the app while the email remains unverified.
+
+Supabase Storage remains the intended media/file provider. Other app feature repositories still contain legacy Supabase database/realtime/function integrations and are not all migrated by this Android authentication change.
 
 Configure the Firebase project `musictx-69ad6` in the Firebase Console:
 
@@ -298,8 +296,8 @@ Configure the Firebase project `musictx-69ad6` in the Firebase Console:
    a separate Android app and add its matching client entry to the local
    `google-services.json`, or configure a separate debug Firebase project.
 4. Enable the desired sign-in providers under **Authentication**.
-5. Create a **Cloud Firestore** database in **Native mode** and configure
-   restrictive security rules before using it.
+5. Create a **Realtime Database** in the Firebase Console and select the database region. Confirm the database URL is present as `firebase_url` in the local `google-services.json`.
+6. Open **Realtime Database → Rules**, paste the repository `database.rules.json` contents, and publish them. These rules require verified Firebase email tokens for account/profile writes.
 
 The Google Services plugin needs a matching client entry for each application
 ID being built. The Firebase configuration file is ignored by Git and must not
