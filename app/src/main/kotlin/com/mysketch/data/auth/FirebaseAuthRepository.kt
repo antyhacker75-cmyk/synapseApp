@@ -54,14 +54,12 @@ class FirebaseAuthRepository(
     override suspend fun signUpWithProfile(email: String, password: String, username: String): Result<String> = runCatching {
         val result = auth.createUserWithEmailAndPassword(email.trim(), password).await()
         val user = result.user ?: error("Firebase did not return a user account")
-        try {
-            writeUserDocuments(user, username)
-            runCatching { user.sendEmailVerification().await() }
-            user.uid
-        } catch (error: Exception) {
-            runCatching { user.delete().await() }
-            throw error
-        }
+        // Do not delete a successfully-created Firebase Auth account when Firestore is
+        // temporarily unavailable. The account must remain recoverable through sign-in
+        // and password reset while profile creation is retried.
+        writeUserDocuments(user, username, includeCreatedAt = true)
+        runCatching { user.sendEmailVerification().await() }
+        user.uid
     }
 
     override suspend fun ensureProfileExists(userId: String, email: String, username: String?): Result<Unit> = runCatching {
@@ -69,10 +67,18 @@ class FirebaseAuthRepository(
         require(user != null && user.uid == userId) {
             "The signed-in Firebase user does not match the requested profile"
         }
-        writeUserDocuments(user, username?.trim()?.takeIf { it.isNotEmpty() } ?: email.substringBefore("@"))
+        writeUserDocuments(
+            user,
+            username?.trim()?.takeIf { it.isNotEmpty() } ?: email.substringBefore("@"),
+            includeCreatedAt = false
+        )
     }
 
-    private suspend fun writeUserDocuments(user: FirebaseUser, username: String) {
+    private suspend fun writeUserDocuments(
+        user: FirebaseUser,
+        username: String,
+        includeCreatedAt: Boolean
+    ) {
         val normalized = username.trim().lowercase().ifBlank { user.email?.substringBefore("@")?.lowercase() ?: "member" }
         val common = hashMapOf<String, Any>(
             "uid" to user.uid,
@@ -82,15 +88,15 @@ class FirebaseAuthRepository(
             "emailVerified" to user.isEmailVerified,
             "updatedAt" to com.google.firebase.firestore.FieldValue.serverTimestamp()
         )
-        val userDocument = firestore.collection("users").document(user.uid)
-        val existingUser = userDocument.get().await()
+        // Avoid a read-before-write: the previous get().await() failed while Firestore
+        // was offline and caused registration to roll back the Auth account.
         val userData = HashMap(common).apply {
-            if (!existingUser.exists()) {
+            if (includeCreatedAt) {
                 put("createdAt", com.google.firebase.firestore.FieldValue.serverTimestamp())
             }
         }
         val profileData = HashMap(common).apply { put("displayName", normalized) }
-        userDocument.set(userData, SetOptions.merge()).await()
+        firestore.collection("users").document(user.uid).set(userData, SetOptions.merge()).await()
         firestore.collection("profiles").document(user.uid).set(profileData, SetOptions.merge()).await()
     }
 
@@ -153,7 +159,11 @@ class FirebaseAuthRepository(
         val credential = GoogleAuthProvider.getCredential(idToken, null)
         val user = auth.signInWithCredential(credential).await().user
             ?: error("Firebase did not return the Google user")
-        writeUserDocuments(user, user.displayName ?: user.email?.substringBefore("@") ?: "member")
+        writeUserDocuments(
+            user,
+            user.displayName ?: user.email?.substringBefore("@") ?: "member",
+            includeCreatedAt = false
+        )
         user.uid
     }
 
