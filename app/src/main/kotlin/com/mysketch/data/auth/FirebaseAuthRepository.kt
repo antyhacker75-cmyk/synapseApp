@@ -3,8 +3,8 @@ package com.mysketch.data.auth
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.SetOptions
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ServerValue
 import com.mysketch.shared.data.local.database.CachedConversationDao
 import com.mysketch.shared.data.local.database.CachedMessageDao
 import com.mysketch.shared.data.local.database.PostDao
@@ -21,14 +21,13 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 
 /**
- * Android authentication implementation.
- *
- * Firebase Authentication owns credentials and sessions. Cloud Firestore owns
- * the user/profile documents. Supabase is deliberately not referenced here.
+ * Firebase Authentication owns email/password credentials.
+ * Firebase Realtime Database stores account, profile and username-index data.
+ * New account data is written only after the email address is verified.
  */
 class FirebaseAuthRepository(
     private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
-    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(),
+    private val database: FirebaseDatabase = FirebaseDatabase.getInstance(),
     private val cachedMessageDao: CachedMessageDao? = null,
     private val cachedConversationDao: CachedConversationDao? = null,
     private val postDao: PostDao? = null,
@@ -39,11 +38,18 @@ class FirebaseAuthRepository(
 
     override val sessionStatus: Flow<AuthSessionStatus> = callbackFlow {
         val listener = FirebaseAuth.AuthStateListener { firebaseAuth ->
-            trySend(if (firebaseAuth.currentUser != null) AuthSessionStatus.AUTHENTICATED
-            else AuthSessionStatus.NOT_AUTHENTICATED)
+            trySend(
+                if (firebaseAuth.currentUser?.isEmailVerified == true) {
+                    AuthSessionStatus.AUTHENTICATED
+                } else {
+                    AuthSessionStatus.NOT_AUTHENTICATED
+                }
+            )
         }
-        trySend(if (auth.currentUser != null) AuthSessionStatus.AUTHENTICATED
-        else AuthSessionStatus.INITIALIZING)
+        trySend(
+            if (auth.currentUser?.isEmailVerified == true) AuthSessionStatus.AUTHENTICATED
+            else AuthSessionStatus.INITIALIZING
+        )
         auth.addAuthStateListener(listener)
         awaitClose { auth.removeAuthStateListener(listener) }
     }
@@ -54,11 +60,10 @@ class FirebaseAuthRepository(
     override suspend fun signUpWithProfile(email: String, password: String, username: String): Result<String> = runCatching {
         val result = auth.createUserWithEmailAndPassword(email.trim(), password).await()
         val user = result.user ?: error("Firebase did not return a user account")
-        // Send verification immediately after creating the account. If the Firestore
-        // write is rejected (for example, unpublished Firestore rules), the account and
-        // verification email still exist and the user can sign in to retry profile setup.
+
+        // Do not create database profile records before verification. The user receives
+        // the verification email immediately and must verify before signing in.
         user.sendEmailVerification().await()
-        writeUserDocuments(user, username, includeCreatedAt = true)
         user.uid
     }
 
@@ -67,52 +72,67 @@ class FirebaseAuthRepository(
         require(user != null && user.uid == userId) {
             "The signed-in Firebase user does not match the requested profile"
         }
-        writeUserDocuments(
+        user.reload().await()
+        user.getIdToken(true).await()
+        require(user.isEmailVerified) { "Verify your email address before creating your profile" }
+        writeUserRecords(
             user,
             username?.trim()?.takeIf { it.isNotEmpty() } ?: email.substringBefore("@"),
             includeCreatedAt = false
         )
     }
 
-    private suspend fun writeUserDocuments(
+    private suspend fun writeUserRecords(
         user: FirebaseUser,
         username: String,
         includeCreatedAt: Boolean
     ) {
-        val normalized = username.trim().lowercase().ifBlank { user.email?.substringBefore("@")?.lowercase() ?: "member" }
-        val common = hashMapOf<String, Any>(
+        require(user.isEmailVerified) { "Email verification is required before writing account data" }
+
+        val normalized = username.trim().lowercase()
+            .ifBlank { user.email?.substringBefore("@")?.lowercase() ?: "member" }
+
+        val userData = hashMapOf<String, Any>(
             "uid" to user.uid,
             "id" to user.uid,
             "email" to (user.email ?: ""),
             "username" to normalized,
-            "emailVerified" to user.isEmailVerified,
-            "updatedAt" to com.google.firebase.firestore.FieldValue.serverTimestamp()
+            "emailVerified" to true,
+            "updatedAt" to ServerValue.TIMESTAMP
         )
-        // Avoid a read-before-write: the previous get().await() failed while Firestore
-        // was offline and caused registration to roll back the Auth account.
-        val userData = HashMap(common).apply {
-            if (includeCreatedAt) {
-                put("createdAt", com.google.firebase.firestore.FieldValue.serverTimestamp())
-            }
+        if (includeCreatedAt) userData["createdAt"] = ServerValue.TIMESTAMP
+
+        val profileData = HashMap(userData).apply {
+            put("displayName", normalized)
         }
-        val profileData = HashMap(common).apply { put("displayName", normalized) }
-        firestore.collection("users").document(user.uid).set(userData, SetOptions.merge()).await()
-        firestore.collection("profiles").document(user.uid).set(profileData, SetOptions.merge()).await()
+
+        // Realtime Database creates these paths automatically when updateChildren()
+        // writes them. Multi-location update keeps the records and username index in sync.
+        val updates = hashMapOf<String, Any?>(
+            "users/${user.uid}" to userData,
+            "profiles/${user.uid}" to profileData,
+            "usernames/$normalized" to user.uid
+        )
+        database.reference.updateChildren(updates).await()
     }
 
     override suspend fun signIn(email: String, password: String): Result<String> = runCatching {
         val user = auth.signInWithEmailAndPassword(email.trim(), password).await().user
             ?: error("Firebase did not return the signed-in user")
         user.reload().await()
-        // Repair missing user/profile documents for accounts created before the Firestore
-        // migration or when an earlier profile write failed.
-        writeUserDocuments(
-            user,
-            user.displayName?.trim()?.takeIf { it.isNotEmpty() }
-                ?: user.email?.substringBefore("@")
-                ?: "member",
-            includeCreatedAt = false
-        )
+        user.getIdToken(true).await()
+
+        // Keep unverified accounts out of the app and out of protected database paths.
+        // AuthViewModel detects this account and opens the verification screen.
+        if (user.isEmailVerified) {
+            writeUserRecords(
+                user,
+                user.displayName?.trim()?.takeIf { it.isNotEmpty() }
+                    ?: user.email?.substringBefore("@")
+                    ?: "member",
+                includeCreatedAt = false
+            )
+        }
         user.uid
     }
 
@@ -131,14 +151,16 @@ class FirebaseAuthRepository(
     override fun getCurrentUserId(): String? = auth.currentUser?.uid
     override fun getCurrentUserEmail(): String? = auth.currentUser?.email
     override fun isEmailVerified(): Boolean = auth.currentUser?.isEmailVerified == true
-    override fun restoreSession(): Boolean = auth.currentUser != null
+
+    // A cached Firebase session must not bypass the email-verification gate on app restart.
+    override fun restoreSession(): Boolean = auth.currentUser?.isEmailVerified == true
 
     override suspend fun refreshSession(): Result<Unit> = runCatching {
         val user = auth.currentUser ?: error("No Firebase user is signed in")
         user.reload().await()
         user.getIdToken(true).await()
         if (user.isEmailVerified) {
-            writeUserDocuments(
+            writeUserRecords(
                 user,
                 user.displayName?.trim()?.takeIf { it.isNotEmpty() }
                     ?: user.email?.substringBefore("@")
@@ -154,10 +176,12 @@ class FirebaseAuthRepository(
     }
 
     override suspend fun resendVerificationEmail(email: String): Result<Unit> = runCatching {
-        val user = auth.currentUser ?: error("Sign in before requesting email verification")
+        val user = auth.currentUser ?: error("Register or sign in before requesting email verification")
         require(user.email.equals(email.trim(), ignoreCase = true)) {
-            "The requested email does not match the signed-in account"
+            "The requested email does not match the current account"
         }
+        user.reload().await()
+        require(!user.isEmailVerified) { "This email address is already verified. You can sign in now." }
         user.sendEmailVerification().await()
     }
 
@@ -181,7 +205,10 @@ class FirebaseAuthRepository(
         val credential = GoogleAuthProvider.getCredential(idToken, null)
         val user = auth.signInWithCredential(credential).await().user
             ?: error("Firebase did not return the Google user")
-        writeUserDocuments(
+        user.reload().await()
+        user.getIdToken(true).await()
+        require(user.isEmailVerified) { "Verify your Google account email before continuing" }
+        writeUserRecords(
             user,
             user.displayName ?: user.email?.substringBefore("@") ?: "member",
             includeCreatedAt = false
@@ -207,8 +234,14 @@ class FirebaseAuthRepository(
 
     override suspend fun deleteAccount(): Result<Unit> = runCatching {
         val user = auth.currentUser ?: error("No Firebase user is signed in")
-        firestore.collection("users").document(user.uid).delete().await()
-        firestore.collection("profiles").document(user.uid).delete().await()
+        val userSnapshot = database.reference.child("users").child(user.uid).get().await()
+        val oldUsername = userSnapshot.child("username").getValue(String::class.java)
+        val updates = hashMapOf<String, Any?>(
+            "users/${user.uid}" to null,
+            "profiles/${user.uid}" to null
+        )
+        if (!oldUsername.isNullOrBlank()) updates["usernames/${oldUsername.lowercase()}"] = null
+        database.reference.updateChildren(updates).await()
         user.delete().await()
     }
 
