@@ -32,7 +32,7 @@ import javax.inject.Named
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.database.FirebaseDatabase
 import com.mysketch.data.auth.FirebaseAuthRepository
 
 @Module
@@ -82,7 +82,7 @@ object BackendModule {
     ): AuthRepository {
         return FirebaseAuthRepository(
             auth = FirebaseAuth.getInstance(),
-            firestore = FirebaseFirestore.getInstance(),
+            database = FirebaseDatabase.getInstance(),
             cachedMessageDao = cachedMessageDao,
             cachedConversationDao = cachedConversationDao,
             postDao = postDao,
@@ -124,7 +124,7 @@ object BackendModule {
         val legacyRepository = com.mysketch.shared.data.repository.UserRepositoryImpl(storageDatabase, userDataSource)
         return com.mysketch.data.auth.FirebaseUsernameAvailabilityRepository(
             delegate = legacyRepository,
-            firestore = FirebaseFirestore.getInstance()
+            database = FirebaseDatabase.getInstance()
         )
     }
 
