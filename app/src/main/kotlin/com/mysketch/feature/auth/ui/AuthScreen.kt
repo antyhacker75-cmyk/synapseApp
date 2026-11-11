@@ -38,6 +38,7 @@ fun AuthScreen(
         when (event) {
             is AuthNavigationEvent.NavigateToMain -> onNavigateToMain()
             is AuthNavigationEvent.NavigateToSignIn -> {
+                authViewModel.showSignInScreen()
                 navController.navigate("authMain") {
                     popUpTo("authMain") { inclusive = true }
                 }
