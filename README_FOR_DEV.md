@@ -282,6 +282,31 @@ Supabase and third-party credentials are injected into `BuildConfig` at build ti
 | `debug` | `com.mysketch.debug` | Local development |
 | `release` | `com.mysketch` | Release builds |
 
+### Firebase backend migration setup
+
+The Android module now includes Firebase Authentication and Cloud Firestore SDKs
+under the existing Firebase BoM. This is the dependency foundation only; existing
+Supabase authentication, PostgreSQL, Realtime, and Edge Function call sites have
+not yet been migrated. Supabase Storage is intended to remain the file-storage
+provider during the migration.
+
+Configure the Firebase project `musictx-69ad6` in the Firebase Console:
+
+1. Register the release Android app with package name `com.mysketch`.
+2. Download its `google-services.json` into `app/google-services.json`.
+3. The debug build uses application ID `com.mysketch.debug`; register this as
+   a separate Android app and add its matching client entry to the local
+   `google-services.json`, or configure a separate debug Firebase project.
+4. Enable the desired sign-in providers under **Authentication**.
+5. Create a **Cloud Firestore** database in **Native mode** and configure
+   restrictive security rules before using it.
+
+The Google Services plugin needs a matching client entry for each application
+ID being built. The Firebase configuration file is ignored by Git and must not
+be committed. Do not put Firebase Admin service-account credentials in the app
+or repository. Firebase client configuration is not a substitute for Firestore
+security rules.
+
 ### Release signing
 
 Release signing credentials are intentionally not stored in `app/build.gradle`.
