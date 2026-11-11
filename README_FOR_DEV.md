@@ -282,6 +282,25 @@ Supabase and third-party credentials are injected into `BuildConfig` at build ti
 | `debug` | `com.mysketch.debug` | Local development |
 | `release` | `com.mysketch` | Release builds |
 
+### Release signing
+
+Release signing credentials are intentionally not stored in `app/build.gradle`.
+For a locally signed release, create the ignored root-level `keystore.properties` file:
+
+```properties
+storeFile=app/release_key.jks
+storePassword=YOUR_STORE_PASSWORD
+keyAlias=YOUR_KEY_ALIAS
+keyPassword=YOUR_KEY_PASSWORD
+```
+
+Alternatively, configure the following CI environment variables:
+`RELEASE_STORE_FILE`, `RELEASE_STORE_PASSWORD`, `RELEASE_KEY_ALIAS`,
+and `RELEASE_KEY_PASSWORD`. Environment variables take precedence over
+`keystore.properties`. Keep the keystore and properties file out of Git.
+If none of the four values are supplied, `assembleRelease` creates an
+unsigned APK; sign it through your protected release pipeline before distribution.
+
 ---
 
 ## 8. Coding Standards & Conventions
