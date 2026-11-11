@@ -12,8 +12,19 @@ plugins {
 def keystoreProperties = new Properties()
 def keystorePropertiesFile = rootProject.file('keystore.properties')
 if (keystorePropertiesFile.exists()) {
-    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+    keystorePropertiesFile.withInputStream { stream ->
+        keystoreProperties.load(stream)
+    }
 }
+
+// Release signing credentials must never be committed to the repository or embedded in
+// the build script. Supply them through environment variables or an ignored keystore.properties.
+def releaseStoreFile = System.getenv('RELEASE_STORE_FILE') ?: keystoreProperties.getProperty('storeFile')
+def releaseStorePassword = System.getenv('RELEASE_STORE_PASSWORD') ?: keystoreProperties.getProperty('storePassword')
+def releaseKeyAlias = System.getenv('RELEASE_KEY_ALIAS') ?: keystoreProperties.getProperty('keyAlias')
+def releaseKeyPassword = System.getenv('RELEASE_KEY_PASSWORD') ?: keystoreProperties.getProperty('keyPassword')
+def hasReleaseSigning = [releaseStoreFile, releaseStorePassword, releaseKeyAlias, releaseKeyPassword]
+    .every { value -> value != null && !value.toString().trim().isEmpty() }
 
 def getGitCommitHash = { ->
     return "git rev-parse --short HEAD".execute().text.trim()
@@ -46,10 +57,12 @@ android {
             // Use default debug keystore
         }
         release {
-            storeFile file("release_key.jks")
-            storePassword "1111"
-            keyAlias "ashik"
-            keyPassword "1111"
+            if (hasReleaseSigning) {
+                storeFile file(releaseStoreFile)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
         }
     }
 
@@ -76,7 +89,11 @@ android {
             minifyEnabled = true
             shrinkResources = true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            signingConfig = signingConfigs.release
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.release
+            } else {
+                logger.lifecycle("Release signing is not configured; assembleRelease will produce an unsigned APK.")
+            }
             buildConfigField "String", "DEVELOPER_EMAIL", "\"mashikahamed0@gmail.com\""
             // The call-simulation switch is debug-only, but the inbox reads it from the shared
             // source set, so the release variant needs the field to compile. Always false here:
