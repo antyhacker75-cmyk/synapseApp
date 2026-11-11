@@ -87,7 +87,7 @@ jobs:
           fi
           printf '%s\n' "$GOOGLE_SERVICES_JSON" > app/google-services.json
           # Validate the current Firebase project and release application ID using JSON fields.
-          jq -e '.project_info.project_number == "165546493522"' app/google-services.json >/dev/null || {
+          jq -e '.project_info.project_number == "1086962075256"' app/google-services.json >/dev/null || {
             echo "::error title=google-services.json::unexpected Firebase project number"
             exit 1
           }
@@ -195,8 +195,10 @@ jobs:
       - name: ✏️ Rename APKs with commit hash
         run: |
           cd app/build/outputs/apk/release
-          for apk in app-*-release.apk; do
-            mv "$apk" "${apk%.apk}-${{ steps.set_sha.outputs.short_sha }}.apk"
+          for apk in app-*.apk; do
+            base="${apk%.apk}"
+            base="${base%-unsigned}"
+            mv -- "$apk" "${base}-${{ steps.set_sha.outputs.short_sha }}.apk"
           done
           ls -la
 
