@@ -270,11 +270,11 @@ run_gradle() {
 
 verify_apk_artifacts() {
   local dir="$WORKSPACE/app/build/outputs/apk/release" count=0
-  count="$(find "$dir" -maxdepth 1 -name 'app-*-release.apk' 2>/dev/null | wc -l | tr -d ' ')"
+  count="$(find "$dir" -maxdepth 1 -type f -name 'app-*.apk' 2>/dev/null | wc -l | tr -d ' ')"
   log "release APK artifacts found: $count"
   APK_COUNT="$count"
   if [ "${count:-0}" -lt 1 ]; then
-    printf '::error title=APK artifacts::the build succeeded but produced no app-*-release.apk\n'
+    printf '::error title=APK artifacts::the build succeeded but produced no app-*.apk in app/build/outputs/apk/release\n'
     return 1
   fi
   if [ "${count:-0}" -lt 3 ]; then
