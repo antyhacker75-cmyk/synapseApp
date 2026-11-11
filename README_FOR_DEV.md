@@ -302,7 +302,7 @@ Configure the Firebase project `musictx-69ad6` in the Firebase Console:
 The Google Services plugin needs a matching client entry for each application
 ID being built. The Firebase configuration file is ignored by Git and must not
 be committed. Do not put Firebase Admin service-account credentials in the app
-or repository. Firebase client configuration is not a substitute for Firestore
+or repository. Firebase client configuration is not a substitute for Realtime Database
 security rules.
 
 ### Release signing
