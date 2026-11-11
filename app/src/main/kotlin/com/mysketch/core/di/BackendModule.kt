@@ -31,6 +31,9 @@ import io.ktor.client.HttpClient
 import javax.inject.Named
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.mysketch.data.auth.FirebaseAuthRepository
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -70,7 +73,6 @@ object BackendModule {
     @Provides
     @Singleton
     fun provideSharedAuthRepository(
-        client: SupabaseClientType,
         cachedMessageDao: CachedMessageDao,
         cachedConversationDao: CachedConversationDao,
         postDao: PostDao,
@@ -78,8 +80,9 @@ object BackendModule {
         offlineActionRepository: OfflineActionRepository,
         syncManager: SyncManager
     ): AuthRepository {
-        return SupabaseAuthRepository(
-            client = client,
+        return FirebaseAuthRepository(
+            auth = FirebaseAuth.getInstance(),
+            firestore = FirebaseFirestore.getInstance(),
             cachedMessageDao = cachedMessageDao,
             cachedConversationDao = cachedConversationDao,
             postDao = postDao,
