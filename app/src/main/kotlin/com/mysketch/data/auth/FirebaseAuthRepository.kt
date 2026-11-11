@@ -73,7 +73,7 @@ class FirebaseAuthRepository(
     }
 
     private suspend fun writeUserDocuments(user: FirebaseUser, username: String) {
-        val normalized = username.trim().ifBlank { user.email?.substringBefore("@") ?: "member" }
+        val normalized = username.trim().lowercase().ifBlank { user.email?.substringBefore("@")?.lowercase() ?: "member" }
         val common = hashMapOf<String, Any>(
             "uid" to user.uid,
             "id" to user.uid,
@@ -82,11 +82,15 @@ class FirebaseAuthRepository(
             "emailVerified" to user.isEmailVerified,
             "updatedAt" to com.google.firebase.firestore.FieldValue.serverTimestamp()
         )
+        val userDocument = firestore.collection("users").document(user.uid)
+        val existingUser = userDocument.get().await()
         val userData = HashMap(common).apply {
-            put("createdAt", com.google.firebase.firestore.FieldValue.serverTimestamp())
+            if (!existingUser.exists()) {
+                put("createdAt", com.google.firebase.firestore.FieldValue.serverTimestamp())
+            }
         }
         val profileData = HashMap(common).apply { put("displayName", normalized) }
-        firestore.collection("users").document(user.uid).set(userData, SetOptions.merge()).await()
+        userDocument.set(userData, SetOptions.merge()).await()
         firestore.collection("profiles").document(user.uid).set(profileData, SetOptions.merge()).await()
     }
 
