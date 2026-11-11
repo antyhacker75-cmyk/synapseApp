@@ -54,11 +54,11 @@ class FirebaseAuthRepository(
     override suspend fun signUpWithProfile(email: String, password: String, username: String): Result<String> = runCatching {
         val result = auth.createUserWithEmailAndPassword(email.trim(), password).await()
         val user = result.user ?: error("Firebase did not return a user account")
-        // Do not delete a successfully-created Firebase Auth account when Firestore is
-        // temporarily unavailable. The account must remain recoverable through sign-in
-        // and password reset while profile creation is retried.
+        // Send verification immediately after creating the account. If the Firestore
+        // write is rejected (for example, unpublished Firestore rules), the account and
+        // verification email still exist and the user can sign in to retry profile setup.
+        user.sendEmailVerification().await()
         writeUserDocuments(user, username, includeCreatedAt = true)
-        runCatching { user.sendEmailVerification().await() }
         user.uid
     }
 
@@ -101,8 +101,19 @@ class FirebaseAuthRepository(
     }
 
     override suspend fun signIn(email: String, password: String): Result<String> = runCatching {
-        auth.signInWithEmailAndPassword(email.trim(), password).await().user?.uid
+        val user = auth.signInWithEmailAndPassword(email.trim(), password).await().user
             ?: error("Firebase did not return the signed-in user")
+        user.reload().await()
+        // Repair missing user/profile documents for accounts created before the Firestore
+        // migration or when an earlier profile write failed.
+        writeUserDocuments(
+            user,
+            user.displayName?.trim()?.takeIf { it.isNotEmpty() }
+                ?: user.email?.substringBefore("@")
+                ?: "member",
+            includeCreatedAt = false
+        )
+        user.uid
     }
 
     override suspend fun signOut(): Result<Unit> = runCatching {
@@ -123,7 +134,18 @@ class FirebaseAuthRepository(
     override fun restoreSession(): Boolean = auth.currentUser != null
 
     override suspend fun refreshSession(): Result<Unit> = runCatching {
-        (auth.currentUser ?: error("No Firebase user is signed in")).getIdToken(true).await()
+        val user = auth.currentUser ?: error("No Firebase user is signed in")
+        user.reload().await()
+        user.getIdToken(true).await()
+        if (user.isEmailVerified) {
+            writeUserDocuments(
+                user,
+                user.displayName?.trim()?.takeIf { it.isNotEmpty() }
+                    ?: user.email?.substringBefore("@")
+                    ?: "member",
+                includeCreatedAt = false
+            )
+        }
         Unit
     }
 

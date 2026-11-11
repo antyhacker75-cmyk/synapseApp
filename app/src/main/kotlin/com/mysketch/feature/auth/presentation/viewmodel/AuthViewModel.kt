@@ -144,9 +144,17 @@ class AuthViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = state.copy(isLoading = true, generalError = null, isErrorDismissed = false)
             signInUseCase(state.email, state.password).fold(
-                onSuccess = {
-                    _uiState.value = state.copy(isLoading = false)
-                    _navigationEvent.emit(AuthNavigationEvent.NavigateToMain)
+                onSuccess = { userId ->
+                    if (authRepository.isEmailVerified()) {
+                        _uiState.value = state.copy(isLoading = false)
+                        _navigationEvent.emit(AuthNavigationEvent.NavigateToMain)
+                    } else {
+                        val email = authRepository.getCurrentUserEmail() ?: state.email
+                        _uiState.value = AuthUiState.EmailVerification(email = email)
+                        _navigationEvent.emit(AuthNavigationEvent.NavigateToEmailVerification(email))
+                        startResendCooldown()
+                        checkEmailVerification(email)
+                    }
                 },
                 onFailure = { error ->
                     _uiState.value = state.copy(

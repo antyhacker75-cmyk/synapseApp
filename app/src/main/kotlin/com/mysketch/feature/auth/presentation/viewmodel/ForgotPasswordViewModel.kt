@@ -51,10 +51,14 @@ class ForgotPasswordViewModel @Inject constructor(
                      _uiState.value = state.copy(isLoading = false, isEmailSent = true, generalError = null)
                  },
                  onFailure = { error ->
-                     _uiState.value = state.copy(
-                         isLoading = false,
-                         generalError = error.message ?: "Failed to send reset link. Please try again."
-                     )
+                     val message = when ((error as? com.google.firebase.auth.FirebaseAuthException)?.errorCode) {
+                         "ERROR_INVALID_EMAIL" -> "That email address is not valid."
+                         "ERROR_USER_NOT_FOUND" -> "No account was found for that email address."
+                         "ERROR_TOO_MANY_REQUESTS" -> "Too many reset requests. Please wait and try again."
+                         "ERROR_NETWORK_REQUEST_FAILED" -> "Network error. Check your internet connection and try again."
+                         else -> error.message ?: "Firebase could not send the password reset email. Check your connection and Firebase email settings."
+                     }
+                     _uiState.value = state.copy(isLoading = false, generalError = message)
                  }
              )
          }
