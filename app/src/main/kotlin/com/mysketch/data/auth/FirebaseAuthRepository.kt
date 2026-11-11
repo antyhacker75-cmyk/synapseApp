@@ -2,6 +2,7 @@ package com.mysketch.data.auth
 
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ServerValue
@@ -61,8 +62,11 @@ class FirebaseAuthRepository(
         val result = auth.createUserWithEmailAndPassword(email.trim(), password).await()
         val user = result.user ?: error("Firebase did not return a user account")
 
-        // Do not create database profile records before verification. The user receives
-        // the verification email immediately and must verify before signing in.
+        // Preserve the requested username in the Firebase Auth profile while keeping
+        // database records locked until the email address has been verified.
+        user.updateProfile(
+            UserProfileChangeRequest.Builder().setDisplayName(username.trim()).build()
+        ).await()
         user.sendEmailVerification().await()
         user.uid
     }
