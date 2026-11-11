@@ -9,6 +9,7 @@ import com.mysketch.shared.core.util.UiEventManager
 import com.mysketch.shared.domain.usecase.auth.IsEmailVerifiedUseCase
 import com.mysketch.shared.domain.usecase.auth.RefreshSessionUseCase
 import com.mysketch.shared.domain.usecase.auth.ResendVerificationEmailUseCase
+import com.mysketch.shared.domain.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -25,7 +26,8 @@ import javax.inject.Inject
 class EmailVerificationViewModel @Inject constructor(
     private val resendVerificationEmailUseCase: ResendVerificationEmailUseCase,
     private val refreshSessionUseCase: RefreshSessionUseCase,
-    private val isEmailVerifiedUseCase: IsEmailVerifiedUseCase
+    private val isEmailVerifiedUseCase: IsEmailVerifiedUseCase,
+    private val authRepository: AuthRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<AuthUiState>(AuthUiState.EmailVerification(email = ""))
@@ -99,9 +101,10 @@ class EmailVerificationViewModel @Inject constructor(
 
                 refreshSessionUseCase().onSuccess {
                     if (isEmailVerifiedUseCase()) {
-                        _uiState.value = AuthUiState.Success("Email verified successfully")
+                        _uiState.value = AuthUiState.Success("Email verified successfully. You can now sign in.")
                         delay(1000)
-                        _navigationEvent.emit(AuthNavigationEvent.NavigateToMain)
+                        authRepository.signOut()
+                        _navigationEvent.emit(AuthNavigationEvent.NavigateToSignIn)
                     }
                 }
             }
