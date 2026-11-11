@@ -153,7 +153,6 @@ class AuthViewModel @Inject constructor(
                         _uiState.value = AuthUiState.EmailVerification(email = email)
                         _navigationEvent.emit(AuthNavigationEvent.NavigateToEmailVerification(email))
                         startResendCooldown()
-                        checkEmailVerification(email)
                     }
                 },
                 onFailure = { error ->
@@ -456,7 +455,6 @@ class AuthViewModel @Inject constructor(
             _uiState.value = AuthUiState.EmailVerification(email = state.email)
             _navigationEvent.emit(AuthNavigationEvent.NavigateToEmailVerification(state.email))
             startResendCooldown()
-            checkEmailVerification(state.email)
         }
     }
 
