@@ -121,7 +121,11 @@ object BackendModule {
     @Singleton
     fun provideSharedUserRepository(storageDatabase: StorageDatabase, client: SupabaseClientType): com.mysketch.shared.domain.repository.UserRepository {
         val userDataSource = SupabaseUserDataSource(client)
-        return com.mysketch.shared.data.repository.UserRepositoryImpl(storageDatabase, userDataSource)
+        val legacyRepository = com.mysketch.shared.data.repository.UserRepositoryImpl(storageDatabase, userDataSource)
+        return com.mysketch.data.auth.FirebaseUsernameAvailabilityRepository(
+            delegate = legacyRepository,
+            firestore = FirebaseFirestore.getInstance()
+        )
     }
 
     @Provides
